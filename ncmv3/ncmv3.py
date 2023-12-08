@@ -156,7 +156,7 @@ class NcmClient:
         """
         results = []
 
-        if "limit" in params:
+        if params is not None and "limit" in params:
             limit = params['limit']
             if limit == 0:
                 limit = 1000000
@@ -173,15 +173,19 @@ class NcmClient:
             ncm = self.session.get(url, params=params)
             if not (200 <= ncm.status_code < 300):
                 return self.__return_handler(ncm.status_code, ncm.json(), call_type)
-            self.__return_handler(ncm.status_code, ncm.json()['data'], call_type)
-            for d in ncm.json()['data']:
-                results.append(d)
+            data = ncm.json()['data']
+            if isinstance(data, list):
+                self.__return_handler(ncm.status_code, data, call_type)
+                for d in data:
+                    results.append(d)
+            else:
+                results.append(data)
             if "links" in ncm.json():
                 url = ncm.json()['links']['next']
             else:
                 url = None
 
-        if "filter[fields]" in params.keys():
+        if params is not None and "filter[fields]" in params.keys():
             data = []
             fields = params['filter[fields]'].split(",")
             for result in results:
@@ -190,9 +194,10 @@ class NcmClient:
                     if k in fields:
                         items[k] = v
                 data.append(items)
-            return data
+            return {'data': data}
 
-        return results
+        return {'data': results[0]} if len(results) == 1 else {'data': results}
+
 
     def __parse_kwargs(self, kwargs, allowed_params):
         """
@@ -1392,13 +1397,23 @@ class NcmClient:
         Returns exchange sites.
         :param kwargs: A set of zero or more allowed parameters
         in the allowed_params list.
-        :return: A list of exchange sites.
+        :return: A list of exchange sites or a single site if site_id is provided.
         """
         call_type = 'Exchange Sites'
-        get_url = 'https://api.cradlepointecm.com/api/v3/beta/exchange_sites'
+        get_url = f'{self.base_url}/beta/exchange_sites'
 
-        allowed_params = ['exchange_network']
+        if 'site_id' in kwargs:
+            get_url += f'/{kwargs["site_id"]}'
+            response = self.__get_json(get_url, call_type)
+            return response
 
+        allowed_params = ['exchange_network',
+                        'name',
+                        'fields',
+                        'limit',
+                        'sort']
+
+        params = None
         if "search" not in kwargs.keys():
             params = self.__parse_kwargs(kwargs, allowed_params)
         else:
@@ -1406,8 +1421,10 @@ class NcmClient:
                 params = self.__parse_search_kwargs(kwargs, allowed_params)
             else:
                 params = self.__parse_kwargs(kwargs, allowed_params)
-        return self.__get_json(get_url, call_type, params=params)
-    
+
+        response = self.__get_json(get_url, call_type, params=params)
+        return response
+            
 
     def create_exchange_site(self, name, primary_dns, secondary_dns, lan_as_dns, local_domain, exchange_network_id, router_id):
         """
@@ -1430,7 +1447,7 @@ class NcmClient:
         """
         call_type = 'Create Exchange Site'
 
-        post_url = 'https://api.cradlepointecm.com/api/v3/beta/exchange_sites'
+        post_url = f'{self.base_url}/beta/exchange_sites'
 
         data = {
             "data": {
@@ -1466,65 +1483,47 @@ class NcmClient:
         return result
 
 
-    def update_exchange_site(self, site_id, name, primary_dns, secondary_dns, lan_as_dns, local_domain, exchange_network_id, router_id):
+    def update_exchange_site(self, site_id, **kwargs):
         """
         Updates an exchange site.
         :param site_id: ID of the exchange site to update.
         :type site_id: str
-        :param name: New name of the exchange site.
-        :type name: str
-        :param primary_dns: New primary DNS of the exchange site.
-        :type primary_dns: str
-        :param secondary_dns: New secondary DNS of the exchange site.
-        :type secondary_dns: str
-        :param lan_as_dns: Whether LAN is used as DNS.
-        :type lan_as_dns: bool
-        :param local_domain: New local domain of the exchange site.
-        :type local_domain: str
-        :param exchange_network_id: ID of the exchange network.
-        :type exchange_network_id: str
-        :param router_id: ID of the endpoint.
-        :type router_id: str
+        :param kwargs: Keyword arguments for the attributes and relationships of the exchange site.
         :return: The response from the PUT request.
         """
         call_type = 'Update Exchange Site'
+        put_url = f'{self.base_url}/beta/exchange_sites/{site_id}'
 
-        put_url = f'https://api.cradlepointecm.com/api/v3/beta/exchange_sites/{site_id}'
+        allowed_params = ['name', 'primary_dns', 'secondary_dns', 'lan_as_dns', 'local_domain']
 
-        data = {
+        current_site = self.get_exchange_sites(site_id=site_id)
+        exchange_network_id = current_site['data']['relationships']['exchange_network']['data']['id']
+        router_id = current_site['data']['relationships']['endpoints']['data'][0]['id']
+
+        ncm = self.session.put(put_url, data=json.dumps({
             "data": {
                 "type": "exchange_user_managed_sites",
                 "id": site_id,
-                "attributes": {
-                    "name": name,
-                    "primary_dns": primary_dns,
-                    "secondary_dns": secondary_dns,
-                    "lan_as_dns": lan_as_dns,
-                    "local_domain": local_domain
-                },
+                "attributes": {key: value for key, value in kwargs.items() if key in allowed_params},
                 "relationships": {
                     "exchange_network": {
                         "data": {
-                            "id": exchange_network_id,
-                            "type": "exchange_networks"
+                            "type": "exchange_networks",
+                            "id": exchange_network_id
                         }
                     },
                     "endpoints": {
-                        "data": [
-                            {
-                                "id": router_id,
-                                "type": "endpoints"
-                            }
-                        ]
+                        "data": [{
+                            "type": "routers",
+                            "id": router_id
+                        }]
                     }
                 }
             }
-        }
+        }))
 
-        ncm = self.session.put(put_url, data=json.dumps(data))
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
-
 
     def delete_exchange_site(self, site_id):
         """
@@ -1534,12 +1533,12 @@ class NcmClient:
         :return: The response from the DELETE request.
         """
         call_type = 'Delete Exchange Site'
-        delete_url = f'https://api.cradlepointecm.com/api/v3/beta/exchange_sites/{site_id}'
+        delete_url = f'{self.base_url}/beta/exchange_sites{site_id}'
 
         ncm = self.session.delete(delete_url)
         result = self.__return_handler(ncm.status_code, ncm, call_type)
         return result
-    
+
     
 '''
     def get_group_modem_upgrade_jobs(self, **kwargs):
