@@ -72,3 +72,27 @@ n3.set_api_key(api_key)
 
 """Changes the name of a Cellular AP"""
 # print(n3.update_private_cellular_radio(id="01GPS8CBGRA23KMWPK368DCPFT", name="2210CW5000186"))
+
+"""Gets all NCX Sites"""
+# print(n3.get_exchange_sites())
+
+"""Creates an NCX Site"""
+# print(n3.create_exchange_site("API_TEST", "01H5TH6YM50NHTZDSH4FSA9TPH", "1748905"))
+
+"""Changes the name of an NCX Site"""
+# print(n3.update_exchange_site("01HH5NKS5BS14C8QA43P5NEPHW", name="Test1"))
+
+"""Deletes an NCX Site"""
+# print(n3.delete_exchange_site("01HH5NKS5BS14C8QA43P5NEPHW"))
+
+"""Gets all NCX Resources"""
+# print(n3.get_exchange_resources(exchange_network="01H5TH6YM50NHTZDSH4FSA9TPH"))
+
+"""Creates an NCX Resource"""
+# print(n3.create_exchange_resource("01HH5RNPQCFG2JPNWHGRKE37X7", "API Resource", "exchange_fqdn_resources", domain="cp.apitest.wiens.ncx"))
+
+"""Changes the name of an NCX Resource"""
+# print(n3.update_exchange_resource("01HH5SAN5YYPTNTR2YJQRQ5HTA", exchange_network="01H5TH6YM50NHTZDSH4FSA9TPH", name="API TEST 2"))
+
+"""Deletes an NCX Resource"""
+# print(n3.delete_exchange_resource("01HH5RXW60ACVQMJRBDAFN58AR"))
