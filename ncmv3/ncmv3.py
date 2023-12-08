@@ -194,9 +194,9 @@ class NcmClient:
                     if k in fields:
                         items[k] = v
                 data.append(items)
-            return {'data': data}
+            return data
 
-        return {'data': results[0]} if len(results) == 1 else {'data': results}
+        return results
 
 
     def __parse_kwargs(self, kwargs, allowed_params):
@@ -1424,7 +1424,6 @@ class NcmClient:
 
         response = self.__get_json(get_url, call_type, params=params)
         return response
-            
 
     def create_exchange_site(self, name, primary_dns, secondary_dns, lan_as_dns, local_domain, exchange_network_id, router_id):
         """
@@ -1482,7 +1481,6 @@ class NcmClient:
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
         return result
 
-
     def update_exchange_site(self, site_id, **kwargs):
         """
         Updates an exchange site.
@@ -1496,9 +1494,9 @@ class NcmClient:
 
         allowed_params = ['name', 'primary_dns', 'secondary_dns', 'lan_as_dns', 'local_domain']
 
-        current_site = self.get_exchange_sites(site_id=site_id)
-        exchange_network_id = current_site['data']['relationships']['exchange_network']['data']['id']
-        router_id = current_site['data']['relationships']['endpoints']['data'][0]['id']
+        current_site = self.get_exchange_sites(site_id=site_id)[0]
+        exchange_network_id = current_site['relationships']['exchange_network']['data']['id']
+        router_id = current_site['relationships']['endpoints']['data'][0]['id']
 
         ncm = self.session.put(put_url, data=json.dumps({
             "data": {
@@ -1539,7 +1537,7 @@ class NcmClient:
         result = self.__return_handler(ncm.status_code, ncm, call_type)
         return result
 
-    
+
 '''
     def get_group_modem_upgrade_jobs(self, **kwargs):
         """
@@ -1695,4 +1693,3 @@ class NcmClient:
                 params = self.__parse_kwargs(kwargs, allowed_params)
         return self.__get_json(get_url, call_type, params=params)
 '''
-
