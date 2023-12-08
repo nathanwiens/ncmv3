@@ -1425,7 +1425,7 @@ class NcmClient:
         response = self.__get_json(get_url, call_type, params=params)
         return response
 
-    def create_exchange_site(self, name, primary_dns, secondary_dns, lan_as_dns, local_domain, exchange_network_id, router_id):
+    def create_exchange_site(self, name, exchange_network_id, router_id, local_domain=None, primary_dns=None, secondary_dns=None, lan_as_dns=False):
         """
         Creates an exchange site.
         :param name: Name of the exchange site.
@@ -1479,7 +1479,10 @@ class NcmClient:
 
         ncm = self.session.post(post_url, data=json.dumps(data))
         result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
-        return result
+        if ncm.status_code == 201:
+            return ncm.json()['data']
+        else:
+            return result
 
     def update_exchange_site(self, site_id, **kwargs):
         """
@@ -1497,12 +1500,18 @@ class NcmClient:
         current_site = self.get_exchange_sites(site_id=site_id)[0]
         exchange_network_id = current_site['relationships']['exchange_network']['data']['id']
         router_id = current_site['relationships']['endpoints']['data'][0]['id']
+        attributes = current_site['attributes']
+
+        for key, value in kwargs.items():
+            if key in allowed_params:
+                attributes['key'] = value
+        print(attributes)
 
         ncm = self.session.put(put_url, data=json.dumps({
             "data": {
                 "type": "exchange_user_managed_sites",
                 "id": site_id,
-                "attributes": {key: value for key, value in kwargs.items() if key in allowed_params},
+                "attributes": attributes,
                 "relationships": {
                     "exchange_network": {
                         "data": {
@@ -1537,6 +1546,156 @@ class NcmClient:
         result = self.__return_handler(ncm.status_code, ncm, call_type)
         return result
 
+    def get_exchange_resources(self, exchange_network=None, exchange_site=None, **kwargs):
+        """
+        Returns exchange sites.
+        :param kwargs: A set of zero or more allowed parameters
+        in the allowed_params list.
+        :return: A list of exchange sites or a single site if site_id is provided.
+        """
+        call_type = 'Exchange Resources'
+        get_url = f'{self.base_url}/beta/exchange_resources'
+
+        params = {}
+
+        allowed_params = ['exchange_network',
+                          'name',
+                          'id',
+                          'fields',
+                          'limit',
+                          'sort']
+
+        if kwargs:
+            if "search" not in kwargs.keys():
+                params = self.__parse_kwargs(kwargs, allowed_params)
+            else:
+                if kwargs['search']:
+                    params = self.__parse_search_kwargs(kwargs, allowed_params)
+                else:
+                    params = self.__parse_kwargs(kwargs, allowed_params)
+
+        if exchange_site:
+            params['filter[exchange_site]'] = exchange_site
+        elif exchange_network:
+            params['filter[exchange_network]'] = exchange_network
+
+        response = self.__get_json(get_url, call_type, params=params)
+        return response
+
+    def create_exchange_resource(self, site_id, resource_name, resource_type, **kwargs):
+        """
+        Creates an exchange site.
+        :param site_id: NCX Site ID to add the resource to.
+        :type site_id: str
+        :param resource_name: Name for the new resource
+        :type resource_type: str
+        :param resource_type: exchange_fqdn_resources, exchange_wildcard_fqdn_resources, or exchange_ipsubnet_resources
+        :type resource_type: str
+
+        :return: The response from the POST request.
+        """
+        call_type = 'Create Exchange Site Resource'
+
+        post_url = f'{self.base_url}/beta/exchange_resources'
+        allowed_params = ['name',
+                          'protocols',
+                          'tags',
+                          'domain',
+                          'ip',
+                          'static_prime_ip',
+                          'port_ranges',
+                          'fields',
+                          'limit',
+                          'sort']
+
+        attributes = {key: value for key, value in kwargs.items() if key in allowed_params}
+        attributes['name'] = resource_name
+
+        data = {
+            "data": {
+                "type": resource_type,
+                "attributes": attributes,
+                "relationships": {
+                    "exchange_site": {
+                        "data": {
+                            "id": site_id,
+                            "type": "exchange_sites"
+                        }
+                    }
+                }
+            }
+        }
+
+        ncm = self.session.post(post_url, data=json.dumps(data))
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
+        if ncm.status_code == 201:
+            return ncm.json()['data']
+        else:
+            return result
+
+    def update_exchange_resource(self, resource_id, exchange_network=None, exchange_site=None, **kwargs):
+        """
+        Updates an exchange site.
+        :param resource_id: ID of the exchange resource to update.
+        :type resource_id: str
+        :param kwargs: Keyword arguments for the attributes and relationships of the exchange site.
+        :return: The response from the PUT request.
+        """
+        call_type = 'Update Exchange Site'
+        put_url = f'{self.base_url}/beta/exchange_resources/{resource_id}'
+
+        allowed_params = ['name',
+                          'protocols',
+                          'tags',
+                          'domain',
+                          'ip',
+                          'static_prime_ip',
+                          'port_ranges']
+
+        if exchange_site:
+            current_resource = self.get_exchange_resources(exchange_site=exchange_site, id=resource_id)[0]
+        elif exchange_network:
+            current_resource = self.get_exchange_resources(exchange_network=exchange_network, id=resource_id)[0]
+
+        exchange_site_id = current_resource['relationships']['exchange_site']['data']['id']
+        attributes = current_resource['attributes']
+
+        for key, value in kwargs.items():
+            if key in allowed_params:
+                attributes['key'] = value
+
+        ncm = self.session.put(put_url, data=json.dumps({
+            "data": {
+                "type": current_resource['type'],
+                "id": resource_id,
+                "attributes": attributes,
+                "relationships": {
+                    "exchange_site": {
+                        "data": {
+                            "type": "exchange_networks",
+                            "id": exchange_site_id
+                        }
+                    }
+                }
+            }
+        }))
+
+        result = self.__return_handler(ncm.status_code, ncm.json(), call_type)
+        return result
+
+    def delete_exchange_resource(self, resource_id):
+        """
+        Deletes an exchange resouce.
+        :param resource_id: ID of the exchange resource to delete.
+        :type resource_id: str
+        :return: The response from the DELETE request.
+        """
+        call_type = 'Delete Exchange Site'
+        delete_url = f'{self.base_url}/beta/exchange_resources{resource_id}'
+
+        ncm = self.session.delete(delete_url)
+        result = self.__return_handler(ncm.status_code, ncm, call_type)
+        return result
 
 '''
     def get_group_modem_upgrade_jobs(self, **kwargs):
