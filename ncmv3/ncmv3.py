@@ -426,7 +426,7 @@ class NcmClient:
         :return: A list of routers with details.
         """
         call_type = 'Routers'
-        get_url = f'{self.base_url}/beta/asset_endpoints'
+        get_url = f'{self.base_url}/asset_endpoints'
 
         allowed_params = ['id',
                           'hardware_series',
@@ -455,7 +455,7 @@ class NcmClient:
         :return: A list of subscriptions with details.
         """
         call_type = 'Subscriptions'
-        get_url = f'{self.base_url}/beta/subscriptions'
+        get_url = f'{self.base_url}/subscriptions'
 
         allowed_params = ['end_time',
                           'end_time__lt',
@@ -1672,7 +1672,7 @@ class NcmClient:
                 "relationships": {
                     "exchange_site": {
                         "data": {
-                            "type": "exchange_networks",
+                            "type": "exchange_sites",
                             "id": exchange_site_id
                         }
                     }
@@ -1685,7 +1685,7 @@ class NcmClient:
 
     def delete_exchange_resource(self, resource_id):
         """
-        Deletes an exchange resouce.
+        Deletes an exchange resource.
         :param resource_id: ID of the exchange resource to delete.
         :type resource_id: str
         :return: The response from the DELETE request.
